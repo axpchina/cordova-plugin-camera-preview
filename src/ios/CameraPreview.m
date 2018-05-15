@@ -1,6 +1,7 @@
 #import <Cordova/CDV.h>
 #import <Cordova/CDVPlugin.h>
 #import <Cordova/CDVInvokedUrlCommand.h>
+#import <MediaPlayer/MediaPlayer.h>
 
 #import "CameraPreview.h"
 
@@ -12,9 +13,29 @@
     self.webView.backgroundColor = [UIColor clearColor];
 }
 
+-(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    
+    if ([keyPath isEqual:@"outputVolume"]) {
+        float volumeLevel = [[MPMusicPlayerController applicationMusicPlayer] volume];
+        if (volumeLevel <= 0.1 || volumeLevel >= 0.9) {
+             [[MPMusicPlayerController applicationMusicPlayer] setVolume:(float) 0.5f];
+        }
+        else{
+            [self.commandDelegate evalJs:@"window.volumeButtonTaken()"];
+        }
+        
+    }
+}
+
 - (void) startCamera:(CDVInvokedUrlCommand*)command {
     
     CDVPluginResult *pluginResult;
+    AVAudioSession* audioSession = [AVAudioSession sharedInstance];
+    [audioSession setActive:YES error:nil];
+    [audioSession addObserver:self
+                   forKeyPath:@"outputVolume"
+                      options:0
+                      context:nil];
     
     if (self.sessionManager != nil) {
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Camera already started!"];
@@ -79,7 +100,9 @@
 - (void) stopCamera:(CDVInvokedUrlCommand*)command {
     NSLog(@"stopCamera");
     CDVPluginResult *pluginResult;
-    
+    AVAudioSession* audioSession = [AVAudioSession sharedInstance];
+    [audioSession setActive:YES error:nil];
+    [audioSession removeObserver:self forKeyPath:@"outputVolume"];
     if(self.sessionManager != nil) {
         [self.cameraRenderController.view removeFromSuperview];
         [self.cameraRenderController removeFromParentViewController];
@@ -431,6 +454,7 @@
         [self invokeTakePicture:width withHeight:height withQuality:quality withIndex:index withTs:ts isTap:false];
     } else {
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Camera not started"];
+        
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }
 }
@@ -655,7 +679,6 @@
     [self.sessionManager.stillImageOutput captureStillImageAsynchronouslyFromConnection:connection completionHandler:^(CMSampleBufferRef sampleBuffer, NSError *error) {
         
         NSLog(@"Done creating still image");
-        
         if (error) {
             NSLog(@"%@", error);
         } else {
@@ -710,7 +733,7 @@
             
             UIImage *image = [UIImage imageWithCGImage:resultFinalImage];
             NSData *data = UIImageJPEGRepresentation(image, quality);
-            NSData *thumbImageData = [self resizedImageDataFromHighImage:image withQuality:0.7];
+            NSData *thumbImageData = [self resizedImageDataFromHighImage:image withQuality:0.5];
             
             CGImageRelease(finalImage); // release CGImageRef to remove memory leaks
             CGImageRelease(resultFinalImage); // release CGImageRef to remove memory leaks
