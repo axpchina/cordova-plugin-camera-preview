@@ -11,7 +11,48 @@
     // start as transparent
     self.webView.opaque = NO;
     self.webView.backgroundColor = [UIColor clearColor];
+    
+    motionManager = [[CMMotionManager alloc] init];
+    motionManager.accelerometerUpdateInterval = .2;
+    motionManager.gyroUpdateInterval = .2;
+    
+    [motionManager startAccelerometerUpdatesToQueue:[NSOperationQueue currentQueue]
+                                        withHandler:^(CMAccelerometerData  *accelerometerData, NSError *error) {
+                                            if (!error) {
+                                                [self outputAccelertionData:accelerometerData.acceleration];
+                                            }
+                                            else{
+                                                NSLog(@"%@", error);
+                                            }
+                                        }];
 }
+
+- (void)outputAccelertionData:(CMAcceleration)acceleration{
+    UIImageOrientation orientationNew;
+    
+    if (acceleration.x >= 0.75) {
+        orientationNew = UIImageOrientationDown;//
+    }
+    else if (acceleration.x <= -0.75) {
+        orientationNew = UIImageOrientationUp;//left
+    }
+    else if (acceleration.y <= -0.75) {
+        orientationNew = UIImageOrientationRight;//
+    }
+    else if (acceleration.y >= 0.75) {
+        orientationNew = UIImageOrientationLeft;
+    }
+    else {
+        // Consider same as last time
+        return;
+    }
+    
+    if (orientationNew == imageOrientation)
+        return;
+    
+    imageOrientation = orientationNew;
+}
+
 
 -(void) observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
     
@@ -727,16 +768,12 @@
             
             CGImageRef finalImage = [self.cameraRenderController.ciContext createCGImage:finalCImage fromRect:finalCImage.extent];
             UIImage *resultImage = [UIImage imageWithCGImage:finalImage];
-            
-            double radians = [self radiansFromUIImageOrientation:resultImage.imageOrientation];
-            CGImageRef resultFinalImage = [self CGImageRotated:finalImage withRadians:radians];
-            
-            UIImage *image = [UIImage imageWithCGImage:resultFinalImage];
+           
+            UIImage *image = [[UIImage alloc]initWithCGImage:resultImage.CGImage scale:1.0 orientation:imageOrientation];
             NSData *data = UIImageJPEGRepresentation(image, quality);
             NSData *thumbImageData = [self resizedImageDataFromHighImage:image withQuality:0.5];
             
             CGImageRelease(finalImage); // release CGImageRef to remove memory leaks
-            CGImageRelease(resultFinalImage); // release CGImageRef to remove memory leaks
             
             NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
                                                                  NSUserDomainMask, YES);
