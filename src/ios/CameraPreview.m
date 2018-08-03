@@ -632,65 +632,6 @@
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
-- (double)radiansFromUIImageOrientation:(UIImageOrientation)orientation {
-    double radians;
-    
-    switch ([[UIApplication sharedApplication] statusBarOrientation]) {
-        case UIDeviceOrientationPortrait:
-            radians = M_PI_2;
-            break;
-        case UIDeviceOrientationLandscapeLeft:
-            radians = 0.f;
-            break;
-        case UIDeviceOrientationLandscapeRight:
-            radians = M_PI;
-            break;
-        case UIDeviceOrientationPortraitUpsideDown:
-            radians = -M_PI_2;
-            break;
-    }
-    
-    return radians;
-}
-
--(CGImageRef) CGImageRotated:(CGImageRef) originalCGImage withRadians:(double) radians {
-    CGSize imageSize = CGSizeMake(CGImageGetWidth(originalCGImage), CGImageGetHeight(originalCGImage));
-    CGSize rotatedSize;
-    if (radians == M_PI_2 || radians == -M_PI_2) {
-        rotatedSize = CGSizeMake(imageSize.height, imageSize.width);
-    } else {
-        rotatedSize = imageSize;
-    }
-    
-    double rotatedCenterX = rotatedSize.width / 2.f;
-    double rotatedCenterY = rotatedSize.height / 2.f;
-    
-    UIGraphicsBeginImageContextWithOptions(rotatedSize, NO, 1.f);
-    CGContextRef rotatedContext = UIGraphicsGetCurrentContext();
-    if (radians == 0.f || radians == M_PI) { // 0 or 180 degrees
-        CGContextTranslateCTM(rotatedContext, rotatedCenterX, rotatedCenterY);
-        if (radians == 0.0f) {
-            CGContextScaleCTM(rotatedContext, 1.f, -1.f);
-        } else {
-            CGContextScaleCTM(rotatedContext, -1.f, 1.f);
-        }
-        CGContextTranslateCTM(rotatedContext, -rotatedCenterX, -rotatedCenterY);
-    } else if (radians == M_PI_2 || radians == -M_PI_2) { // +/- 90 degrees
-        CGContextTranslateCTM(rotatedContext, rotatedCenterX, rotatedCenterY);
-        CGContextRotateCTM(rotatedContext, radians);
-        CGContextScaleCTM(rotatedContext, 1.f, -1.f);
-        CGContextTranslateCTM(rotatedContext, -rotatedCenterY, -rotatedCenterX);
-    }
-    
-    CGRect drawingRect = CGRectMake(0.f, 0.f, imageSize.width, imageSize.height);
-    CGContextDrawImage(rotatedContext, drawingRect, originalCGImage);
-    CGImageRef rotatedCGImage = CGBitmapContextCreateImage(rotatedContext);
-    
-    UIGraphicsEndImageContext();
-    
-    return rotatedCGImage;
-}
-
 - (void) invokeTakePicture {
     [self invokeTakePicture:0.0 withHeight:0.0 withQuality:1 withIndex:self.nameIndex withTs:self.nameTs isTap:true];
 }
@@ -713,6 +654,82 @@
     
     return UIImageJPEGRepresentation(smallImage, quality);
     
+}
+
+- (UIImage *)fixrotation:(UIImage *)image{
+    
+    if (image.imageOrientation == UIImageOrientationUp) return image;
+    CGAffineTransform transform = CGAffineTransformIdentity;
+    
+    switch (image.imageOrientation) {
+        case UIImageOrientationDown:
+        case UIImageOrientationDownMirrored:
+            transform = CGAffineTransformTranslate(transform, image.size.width, image.size.height);
+            transform = CGAffineTransformRotate(transform, M_PI);
+            break;
+            
+        case UIImageOrientationLeft:
+        case UIImageOrientationLeftMirrored:
+            transform = CGAffineTransformTranslate(transform, image.size.width, 0);
+            transform = CGAffineTransformRotate(transform, M_PI_2);
+            break;
+            
+        case UIImageOrientationRight:
+        case UIImageOrientationRightMirrored:
+            transform = CGAffineTransformTranslate(transform, 0, image.size.height);
+            transform = CGAffineTransformRotate(transform, -M_PI_2);
+            break;
+        case UIImageOrientationUp:
+        case UIImageOrientationUpMirrored:
+            break;
+    }
+    
+    switch (image.imageOrientation) {
+        case UIImageOrientationUpMirrored:
+        case UIImageOrientationDownMirrored:
+            transform = CGAffineTransformTranslate(transform, image.size.width, 0);
+            transform = CGAffineTransformScale(transform, -1, 1);
+            break;
+            
+        case UIImageOrientationLeftMirrored:
+        case UIImageOrientationRightMirrored:
+            transform = CGAffineTransformTranslate(transform, image.size.height, 0);
+            transform = CGAffineTransformScale(transform, -1, 1);
+            break;
+        case UIImageOrientationUp:
+        case UIImageOrientationDown:
+        case UIImageOrientationLeft:
+        case UIImageOrientationRight:
+            break;
+    }
+    
+    // Now we draw the underlying CGImage into a new context, applying the transform
+    // calculated above.
+    CGContextRef ctx = CGBitmapContextCreate(NULL, image.size.width, image.size.height,
+                                             CGImageGetBitsPerComponent(image.CGImage), 0,
+                                             CGImageGetColorSpace(image.CGImage),
+                                             CGImageGetBitmapInfo(image.CGImage));
+    CGContextConcatCTM(ctx, transform);
+    switch (image.imageOrientation) {
+        case UIImageOrientationLeft:
+        case UIImageOrientationLeftMirrored:
+        case UIImageOrientationRight:
+        case UIImageOrientationRightMirrored:
+            // Grr...
+            CGContextDrawImage(ctx, CGRectMake(0,0,image.size.height,image.size.width), image.CGImage);
+            break;
+            
+        default:
+            CGContextDrawImage(ctx, CGRectMake(0,0,image.size.width,image.size.height), image.CGImage);
+            break;
+    }
+    
+    // And now we just create a new UIImage from the drawing context
+    CGImageRef cgimg = CGBitmapContextCreateImage(ctx);
+    UIImage *img = [UIImage imageWithCGImage:cgimg];
+    CGContextRelease(ctx);
+    CGImageRelease(cgimg);
+    return img;
 }
 
 - (void) invokeTakePicture:(CGFloat) width withHeight:(CGFloat) height withQuality:(int) quality withIndex:(NSString*) index withTs:(NSString*) ts isTap:(bool)isTap{
@@ -767,9 +784,7 @@
             NSMutableArray *params = [[NSMutableArray alloc] init];
             
             CGImageRef finalImage = [self.cameraRenderController.ciContext createCGImage:finalCImage fromRect:finalCImage.extent];
-            UIImage *resultImage = [UIImage imageWithCGImage:finalImage];
-           
-            UIImage *image = [[UIImage alloc]initWithCGImage:resultImage.CGImage scale:1.0 orientation:imageOrientation];
+            UIImage *image = [self fixrotation:[[UIImage alloc]initWithCGImage:finalImage scale:1.0 orientation:imageOrientation]] ;
             NSData *data = UIImageJPEGRepresentation(image, quality);
             NSData *thumbImageData = [self resizedImageDataFromHighImage:image withQuality:0.5];
             
@@ -816,5 +831,3 @@
 
 
 @end
-
-
