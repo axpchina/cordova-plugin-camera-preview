@@ -4,8 +4,12 @@
 
 #import "CameraSessionManager.h"
 #import "CameraRenderController.h"
+#import <CoreMotion/CoreMotion.h>
 
-@interface CameraPreview : CDVPlugin <TakePictureDelegate>
+@interface CameraPreview : CDVPlugin <TakePictureDelegate>{
+    CMMotionManager *motionManager;
+    UIImageOrientation imageOrientation;
+}
 
 - (void) startCamera:(CDVInvokedUrlCommand*)command;
 - (void) stopCamera:(CDVInvokedUrlCommand*)command;
@@ -46,6 +50,7 @@
 @property (nonatomic) NSString *onPictureTakenHandlerId;
 @property (nonatomic) NSString *nameTs;
 @property (nonatomic) NSString *nameIndex;
+
 
 @end
 
