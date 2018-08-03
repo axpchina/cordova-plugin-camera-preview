@@ -59,7 +59,7 @@
     if ([keyPath isEqual:@"outputVolume"]) {
         float volumeLevel = [[MPMusicPlayerController applicationMusicPlayer] volume];
         if (volumeLevel <= 0.1 || volumeLevel >= 0.9) {
-             [[MPMusicPlayerController applicationMusicPlayer] setVolume:(float) 0.5f];
+            [[MPMusicPlayerController applicationMusicPlayer] setVolume:(float) 0.5f];
         }
         else{
             [self.commandDelegate evalJs:@"window.volumeButtonTaken()"];
@@ -831,3 +831,4 @@
 
 
 @end
+
