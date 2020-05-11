@@ -71,12 +71,17 @@
 - (void) startCamera:(CDVInvokedUrlCommand*)command {
     
     CDVPluginResult *pluginResult;
-    AVAudioSession* audioSession = [AVAudioSession sharedInstance];
-    [audioSession setActive:YES error:nil];
-    [audioSession addObserver:self
-                   forKeyPath:@"outputVolume"
-                      options:0
-                      context:nil];
+    @try{
+        AVAudioSession* audioSession = [AVAudioSession sharedInstance];
+        [audioSession setActive:YES error:nil];
+        [audioSession addObserver:self
+                       forKeyPath:@"outputVolume"
+                          options:0
+                          context:nil];
+    }
+    @catch(NSException *exception){
+           NSLog(@"Error ocours while installing audo session: %@", exception);
+       }
     
     if (self.sessionManager != nil) {
         pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"Camera already started!"];
@@ -141,9 +146,14 @@
 - (void) stopCamera:(CDVInvokedUrlCommand*)command {
     NSLog(@"stopCamera");
     CDVPluginResult *pluginResult;
-    AVAudioSession* audioSession = [AVAudioSession sharedInstance];
-    [audioSession setActive:YES error:nil];
-    [audioSession removeObserver:self forKeyPath:@"outputVolume"];
+    @try{
+        AVAudioSession* audioSession = [AVAudioSession sharedInstance];
+        [audioSession setActive:YES error:nil];
+        [audioSession removeObserver:self forKeyPath:@"outputVolume"];
+    }
+    @catch(NSException *exception){
+        NSLog(@"Error ocours while uninstalling audo session: %@", exception);
+    }
     if(self.sessionManager != nil) {
         [self.cameraRenderController.view removeFromSuperview];
         [self.cameraRenderController removeFromParentViewController];
